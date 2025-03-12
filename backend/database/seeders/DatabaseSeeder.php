@@ -17,7 +17,7 @@ class DatabaseSeeder extends Seeder
         // User::factory(10)->create();
 
         $user = User::factory()->create([
-            'name' => 'Cristian Seller',
+            'name' => 'Pai do Ecommerce',
             'email' => 'naoresponda@clubedosfoguetes.com.br',
             'cpf'       => '10134711645',
             'password' => bcrypt('d9T66Aw*'),

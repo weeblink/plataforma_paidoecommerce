@@ -30,10 +30,10 @@ Para iniciar a instalação do projeto é necessário ter todas as ferramentas d
 #### Postgres
 ```
 su - postgres
-createdb cristianseller;
+createdb paidoecommerce;
 psql
-CREATE USER cristianseller_user SUPERUSER INHERIT CREATEDB CREATEROLE;
-ALTER USER cristianseller_user PASSWORD '<password_db>';
+CREATE USER paiecom_user SUPERUSER INHERIT CREATEDB CREATEROLE;
+ALTER USER paiecom_user PASSWORD '<password_db>';
 ```
 
 #### .env

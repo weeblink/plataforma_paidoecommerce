@@ -1,4 +1,4 @@
-# Cristian Seller Front-end
+# Pai do Ecommerce Front-end
 
 ## 🎨 Paleta de cores
 

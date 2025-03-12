@@ -140,11 +140,11 @@ class User extends Authenticatable
 
         $details = array(
             'mail'          => $email,
-            'subject'       => "Cristian Seller - Recuperação de senha",
+            'subject'       => "Pai do ecommerce - Recuperação de senha",
             'message'       => "Olá! \n\nAlguém está acessando sua conta e deseja redefinir a senha da sua conta. Para criar uma nova senha para a sua conta basta clicar no botão abaixo para alterar. \n\nCaso não tenha sido você, por favor entre em contato com a equipe de suporte da plataforma",
             'viewName'      => 'mail.recovery-password',
             'username'      => "Usuário",
-            'recovery_link' => env("FRONTEND_URL", "https://imperiumdigital.com.br/") . "reset-password/" . $token
+            'recovery_link' => env("FRONTEND_URL", "https://app.paidoecommerce.com.br/") . "reset-password/" . $token
         );
 
         Log::debug(json_encode($details));
