@@ -55,7 +55,7 @@ export const NAV_LINKS: NavLinks[] = [
     title: 'Suporte',
     icon: PhoneIcon as LucideIcon,
     route:
-      'https://wa.me/5511911463762?text=Ol%C3%A1!%20Vim%20pela%20plataforma%20e%20estou%20precisando%20de%20ajuda%20do%20suporte.',
+      'https://wa.me/5531972532421?text=Ol%C3%A1!%20Vim%20pela%20plataforma%20e%20estou%20precisando%20de%20ajuda%20do%20suporte.',
     role: 'STUDENT',
   },
   {
