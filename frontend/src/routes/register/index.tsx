@@ -78,14 +78,15 @@ export default function RegisterPage() {
 
   return (
     <div className="h-screen w-full lg:grid lg:grid-cols-2">
-      <div className="hidden bg-muted lg:block">
-        <img
-          src="/auth.png"
-          alt="Image"
-          width="1920"
-          height="1080"
-          className="h-full w-full object-cover"
-        />
+      <div
+          className="hidden lg:block bg-black"
+        style={{
+          backgroundImage: `url(/auth.png)`,
+          backgroundPosition: 'center',
+          backgroundSize: 'contain',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
       </div>
       <div className="flex items-center justify-center p-6 sm:px-0 sm:py-12">
         <div className="mx-auto grid w-full max-w-sm gap-6">

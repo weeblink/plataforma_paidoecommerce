@@ -141,14 +141,15 @@ export default function LoginPage() {
             </Form>
           </div>
         </div>
-        <div className="hidden bg-muted lg:block">
-          <img
-            src="/auth.png"
-            alt="Image"
-            width="1920"
-            height="1080"
-            className="h-full w-full object-cover"
-          />
+        <div
+           className="hidden lg:block bg-black"
+          style={{
+            backgroundImage: `url(/auth.png)`,
+            backgroundPosition: 'center',
+            backgroundSize: 'contain',
+            backgroundRepeat: 'no-repeat'
+          }}
+        >
         </div>
       </div>
 
