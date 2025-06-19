@@ -34,6 +34,7 @@ import WhatsappConnections from '@/routes/app/whatsapp-connections'
 import { ManageConnections } from '@/routes/app/manage-connections'
 import MentoringGroupPage from '@/routes/app/mentoring-groups'
 import PaymentPlatformsPage from './app/payment-platforms'
+import CalculatorPage from './app/calculator'
 
 export const router = createBrowserRouter([
   {
@@ -140,6 +141,10 @@ export const router = createBrowserRouter([
         path: '/payment-platforms',
         element: <PaymentPlatformsPage />,
       },
+      {
+        path: '/calculator',
+        element: <CalculatorPage /> 
+      }
     ],
   },
   {

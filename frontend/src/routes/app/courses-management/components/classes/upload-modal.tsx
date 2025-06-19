@@ -60,7 +60,7 @@ export function UploadVideoClassModal({data, onChange}: Props){
             }
     
             const resumable = new Resumable({
-                target: `${env.REACT_APP_API_URL}classes/${data.id}/upload-video`,
+                target: `${env.REACT_APP_API_URL}/classes/${data.id}/upload-video`,
                 chunkSize: 1 * 1024 * 1024,
                 uploadMethod: "POST",
                 simultaneousUploads: 1,

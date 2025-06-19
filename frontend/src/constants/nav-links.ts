@@ -11,6 +11,7 @@ import {
   Headset,
   MessageCircle,
   DollarSign,
+  Calculator,
 } from 'lucide-react'
 
 export interface NavLinks {
@@ -49,6 +50,12 @@ export const NAV_LINKS: NavLinks[] = [
     title: 'Produtos',
     icon: Package as LucideIcon,
     route: '/extra',
+    role: 'STUDENT',
+  },
+  {
+    title: 'Calculadora',
+    icon: Calculator as LucideIcon,
+    route: '/calculator',
     role: 'STUDENT',
   },
   {
