@@ -61,7 +61,7 @@ export default function AppLayout() {
   }
 
   return (
-    <main className="overflow-y-hidden">
+    <main className="min-h-[100dvh] overflow-y-auto lg:h-screen lg:overflow-y-hidden">
       {/* Mobile */}
       <Collapsible
         open={isMobileCollapsed}

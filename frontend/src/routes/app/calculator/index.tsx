@@ -21,10 +21,10 @@ const InputGroup = ({
 }: InputGroupProps) => (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-white">{label}</label>
+        <label className="text-sm font-medium ">{label}</label>
         <button 
           type="button"
-          className="w-5 h-5 bg-gray-400 text-white rounded-full text-xs flex items-center justify-center hover:bg-gray-500 transition-colors"
+          className="w-5 h-5 bg-gray-400  rounded-full text-xs flex items-center justify-center hover:bg-gray-500 transition-colors"
           title={tooltip}
         >
           i
@@ -257,14 +257,14 @@ export default function CalculatorPage(){
 
             {/* Calculate Button */}
             <div className="text-center mb-8">
-                <button className="px-8 py-3 bg-orange-400 hover:bg-orange-500 text-white font-bold rounded-lg transition-colors duration-200 min-w-48" onClick={calculateSuggestedPrice}>
+                <button className="px-8 py-3 bg-orange-400 hover:bg-orange-500  font-bold rounded-lg transition-colors duration-200 min-w-48" onClick={calculateSuggestedPrice}>
                 Calcular
                 </button>
             </div>
 
             {/* Result */}
             <div className="text-center">
-                <h4 className="text-xl font-semibold text-white mb-2">
+                <h4 className="text-xl font-semibold  mb-2">
                     Preço mínimo sugerido
                 </h4>
                 <p className="text-2xl font-bold text-green-600 mb-1">
