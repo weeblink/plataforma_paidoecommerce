@@ -92,7 +92,7 @@ class User extends Authenticatable
      * @return string
      * @throws \Exception
      */
-    public function register($name, $cpf, $email, $password): string
+    public function register($name, $cpf, $email, $password, $external = false): string
     {
         $cpf = preg_replace('/[^0-9]/', '', $cpf);
 
@@ -119,7 +119,9 @@ class User extends Authenticatable
             throw new \Exception("Ocorreu um erro ao tentar salvar o novo cadastro");
         }
 
-        Auth::login($user);
+        if( !$external )
+            Auth::login($user);
+        
         return $user->createToken('token', ['is-student'])->plainTextToken;
     }
 
@@ -222,9 +224,53 @@ class User extends Authenticatable
     public function getLeads(): mixed
     {
         return self::join("users_infos", "users_infos.user_id", "=", "users.id")
-            ->where('users_infos.user_type', "STUDENT")
-            ->select(["users_infos.phone", "users_infos.user_type", "users.name", "users.email", "users.created_at"])
-            ->get();
+        ->where('users_infos.user_type', "STUDENT")
+        ->select([
+            "users_infos.phone", 
+            "users_infos.user_type", 
+            "users.name", 
+            "users.email",
+            "users.id",
+            "users.created_at"
+        ])
+        ->get()
+        ->map(function ($user) {
+
+            $tags = UserProduct::where('user_id', $user->id)->get();
+
+            return [
+                'id'          => $user->id,
+                'phone'       => $user->phone,
+                'user_type'   => $user->user_type,
+                'name'        => $user->name,
+                'email'       => $user->email,
+                'created_at'  => $user->created_at,
+                'tags'        => $tags->map(function($tag) {
+                    
+                    $title = '';
+                    $type = '';
+                    switch($tag->type_product){
+                        case 'course':
+                            $title = $tag->course->title;
+                            $type = 'Curso';
+                            break;
+                        case 'mentorship':
+                            $title = $tag->group->title;
+                            $type = 'Mentoria';
+                            break;
+                        case 'extra':
+                            $title = $tag->extra->title;
+                            $type = 'Extra';
+                            break;
+                    }
+
+                    return [
+                        'title' => $type . " - " . $title,
+                        'id'    => $tag->id
+                    ];
+                })
+            ];
+        });
     }
 
     /**

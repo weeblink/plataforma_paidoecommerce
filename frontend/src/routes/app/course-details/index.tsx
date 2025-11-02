@@ -175,7 +175,10 @@ export default function CourseDetailsPage() {
                 title="video"
                 src={selectedClass.video_url}
                 className="h-full w-full rounded-lg border-none"
+                allow="fullscreen; encrypted-media;"
+                allowFullScreen
               ></iframe>
+
             </AspectRatio>
           </div>
 

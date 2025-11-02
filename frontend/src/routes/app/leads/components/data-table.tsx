@@ -26,13 +26,15 @@ import DataTableSkeleton from '@/components/data-table/data-table-skeleton'
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
-  isLoading: boolean
+  isLoading: boolean,
+  onRefresh: () => void
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
   isLoading,
+  onRefresh
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
@@ -57,7 +59,7 @@ export function DataTable<TData, TValue>({
 
   return (
     <div>
-      <DataTableToolbar table={table} />
+      <DataTableToolbar table={table} onRefresh={onRefresh} />
 
       <div className="rounded-md border">
         <Table>

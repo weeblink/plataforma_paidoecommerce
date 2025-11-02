@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/services/api'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Home, LoaderCircle } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/auth'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export enum TypeUrl {
   Course = 'course',
@@ -171,20 +172,27 @@ export default function PaymentPage() {
   const [productInfo, setProductInfo] = useState<PaymentProductInfo | null>(
     null,
   )
-  const [documentType, setIsDocumentType] = useState<string | null>(null)
-  const [paymentType, setPaymentType] = useState<string | null>(null)
 
   const navigate = useNavigate()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: user?.email || '',
+    },
   })
 
-  form.setValue('email', user?.email as string)
-
-  const watchDocumentType = form.watch('document_type')
   const watchCep = form.watch('postcode')
-  const watchPaymentType = form.watch('type_payment')
+  const documentType = form.watch('document_type')
+  const paymentType = form.watch('type_payment')
+
+  const prevCepRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (watchCep && watchCep.length === 9 && watchCep !== prevCepRef.current) {
+      prevCepRef.current = watchCep
+      searchCepData(watchCep)
+    }
+  }, [watchCep])
 
   async function fetchData() {
     setIsLoading(true)
@@ -238,14 +246,18 @@ export default function PaymentPage() {
   async function searchCepData(cep: string) {
     setIsLoadingCep(true)
     try {
-      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
+      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`, {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store',
+      })
+      if (!res.ok) throw new Error(`viacep ${res.status}`)
       const response = await res.json()
-
-      form.setValue('street', response.logradouro)
-      form.setValue('district', response.bairro)
-      form.setValue('city', response.localidade)
-      form.setValue('state', response.uf)
-    } catch {
+      if (response.erro) throw new Error('CEP inválido')
+      form.setValue('street', response.logradouro ?? '')
+      form.setValue('district', response.bairro ?? '')
+      form.setValue('city', response.localidade ?? '')
+      form.setValue('state', response.uf ?? '')
+    } catch (e: any) {
       toast.error('Não foi possível localizar o endereço do CEP informado')
     } finally {
       setIsLoadingCep(false)
@@ -297,13 +309,12 @@ export default function PaymentPage() {
     try {
       const { data } = await api.post('/payments/create', dataPayment)
       navigate(`/payment/info/${data.payment_id}`)
-    } catch(error) {
-
-      toast.error(
-        error.status === 400
-          ? error.response.data.error
-          :'Não foi possível realizar o pagamento devido a um erro inesperado. Por favor, tente novamente mais tarde',
-      )
+    } catch (error: any) {
+      const status = error?.response?.status
+      const msg = status === 400
+        ? error?.response?.data?.error
+        : 'Não foi possível realizar o pagamento devido a um erro inesperado. Por favor, tente novamente mais tarde'
+      toast.error(msg)
     } finally {
       setIsLoading(false)
     }
@@ -314,18 +325,6 @@ export default function PaymentPage() {
     if (type === TypeUrl.Mentoring) return 'mentorship'
     if (type === TypeUrl.Extra) return 'extra'
   }
-
-  useEffect(() => {
-    if (watchCep && watchCep.length === 9) searchCepData(watchCep)
-  }, [watchCep])
-
-  useEffect(() => {
-    setIsDocumentType(watchDocumentType)
-  }, [watchDocumentType])
-
-  useEffect(() => {
-    setPaymentType(watchPaymentType)
-  }, [watchPaymentType])
 
   useEffect(() => {
     fetchData()
@@ -578,10 +577,7 @@ export default function PaymentPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Tipo de documento</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                        <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione o tipo de documento" />
@@ -769,8 +765,10 @@ export default function PaymentPage() {
                                 <FormItem>
                                   <FormLabel>Estado</FormLabel>
                                   <Select
+                                    key={`state-${field.value || 'empty'}`}
                                     onValueChange={field.onChange}
                                     defaultValue={field.value}
+                                    value={field.value}
                                   >
                                     <FormControl>
                                       <SelectTrigger>
@@ -868,76 +866,28 @@ export default function PaymentPage() {
                     control={form.control}
                     name="type_payment"
                     render={({ field }) => (
-                      <FormItem className="space-y-3">
-                        <FormControl>
-                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                            <div className="border-1 relative flex items-center rounded-lg border bg-card p-4 text-card-foreground">
-                              <input
-                                type="radio"
-                                id="credit_card"
-                                value="credit_card"
-                                className="mr-4"
-                                checked={field.value === 'credit_card'}
-                                onChange={() => field.onChange('credit_card')}
-                              />
-                              <div>
-                                <label
-                                  htmlFor="credit_card"
-                                  className="font-extrabold text-primary"
-                                >
-                                  Cartão de crédito
-                                </label>
-                                <p className="text-sm">
-                                  Pague com cartão de crédito
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="border-1 relative flex items-center rounded-lg border bg-card p-4 text-card-foreground">
-                              <input
-                                type="radio"
-                                id="invoice"
-                                value="invoice"
-                                className="mr-4"
-                                checked={field.value === 'invoice'}
-                                onChange={() => field.onChange('invoice')}
-                              />
-                              <div>
-                                <label
-                                  htmlFor="invoice"
-                                  className="font-extrabold text-primary"
-                                >
-                                  Boleto
-                                </label>
-                                <p className="text-sm">
-                                  Pagamento via boleto bancário
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="border-1 relative flex items-center rounded-lg border bg-card p-4 text-card-foreground">
-                              <input
-                                type="radio"
-                                id="pix"
-                                value="pix"
-                                className="mr-4"
-                                checked={field.value === 'pix'}
-                                onChange={() => field.onChange('pix')}
-                              />
-                              <div>
-                                <label
-                                  htmlFor="pix"
-                                  className="font-extrabold text-primary"
-                                >
-                                  PIX
-                                </label>
-                                <p className="text-sm">
-                                  Pagamento instantâneo com pix
-                                </p>
-                              </div>
-                            </div>
+                      <FormItem>
+                        <RadioGroup
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+                        >
+                          <div className="...">
+                            <RadioGroupItem value="credit_card" id="credit_card" />
+                            <label htmlFor="credit_card" className="font-extrabold text-primary ps-2">Cartão de crédito</label>
+                            <p className="text-sm">Pague com cartão de crédito</p>
                           </div>
-                        </FormControl>
+                          <div className="...">
+                            <RadioGroupItem value="invoice" id="invoice" />
+                            <label htmlFor="invoice" className="font-extrabold text-primary ps-2">Boleto</label>
+                            <p className="text-sm">Pagamento via boleto bancário</p>
+                          </div>
+                          <div className="...">
+                            <RadioGroupItem value="pix" id="pix" />
+                            <label htmlFor="pix" className="font-extrabold text-primary ps-2">PIX</label>
+                            <p className="text-sm">Pagamento instantâneo com pix</p>
+                          </div>
+                        </RadioGroup>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -1059,8 +1009,10 @@ export default function PaymentPage() {
                           <FormItem>
                             <FormLabel>Quantidade de parcelas</FormLabel>
                             <Select
+                              key={`installments-${field.value || 'empty'}`}
                               onValueChange={field.onChange}
                               defaultValue={field.value?.toString()}
+                              value={field.value?.toString()}
                             >
                               <FormControl>
                                 <SelectTrigger>

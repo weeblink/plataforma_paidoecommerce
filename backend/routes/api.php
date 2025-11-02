@@ -133,6 +133,7 @@ Route::middleware('api')->group(function () {
             Route::prefix('courses-management')->group(function () {
 
                 Route::get('/', [CourseManagementController::class, 'listAll']);
+                Route::get('/search', [CourseManagementController::class, 'search']);
                 Route::get('/{id}', [CourseManagementController::class, 'listOne']);
                 Route::post('/', [CourseManagementController::class, 'create']);
                 Route::post('/update/{id}', [CourseManagementController::class, 'update']);
@@ -148,7 +149,11 @@ Route::middleware('api')->group(function () {
 
             Route::controller(LeadController::class)->group(function () {
                 Route::get('/leads', [LeadController::class, 'listAll']);
+                Route::delete('/leads/{id}', [LeadController::class, 'delete']);
+                Route::post('/leads/{id}/allow-access', [LeadController::class, 'allowAccess']);
+                Route::delete('/leads/{id}/remove-access/{productId}', [LeadController::class, 'removeAccess']);
                 Route::get('/leads/search/', [LeadController::class, 'search']);
+                Route::post('/leads/add-new', [LeadController::class, 'addNew']);
             });
 
             Route::prefix('email-marketing')->group(function () {
@@ -186,6 +191,7 @@ Route::middleware('api')->group(function () {
             Route::prefix('extras-management')->group(function () {
                 Route::controller(ExtraManagementController::class)->group(function () {
                     Route::get('/', [ExtraManagementController::class, 'listAll']);
+                    Route::get('/search', [ExtraManagementController::class, 'search']);
                     Route::post('/', [ExtraManagementController::class, 'create']);
                     Route::post('/{id}', [ExtraManagementController::class, 'update']);
                     Route::delete('/{id}', [ExtraManagementController::class, 'delete']);
@@ -195,6 +201,7 @@ Route::middleware('api')->group(function () {
             Route::prefix('mentoring-management')->group(function () {
                 Route::controller(MentoringManagementController::class)->group(function () {
                     Route::get('/', [MentoringManagementController::class, 'listAll']);
+                    Route::get('/search', [MentoringManagementController::class, 'search']);
                     Route::post('/', [MentoringManagementController::class, 'create']);
                     Route::post('/{id}', [MentoringManagementController::class, 'update']);
                     Route::delete('/{id}', [MentoringManagementController::class, 'delete']);

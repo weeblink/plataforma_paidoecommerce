@@ -157,6 +157,22 @@ class CourseManagementController extends Controller
         }
     }
 
+    public function search( Request $request ){
+        try {
+
+            $course = Courses::where('title', 'like', "%" . $request->query('q') . "%")->get();
+
+            return response()->json([
+                'message'       => "success",
+                'data'          => $course
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                "error"     => $e->getMessage()
+            ], 500);
+        }
+    }
+
     /**
      * @OA\Post(
      *     path="/courses-management",

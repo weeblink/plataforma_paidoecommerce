@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\mentorships\CreateOrUpdateMentorshipRequest;
 use App\Models\Mentorship;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -84,6 +85,25 @@ class MentoringManagementController extends Controller
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => 'An unexpected error occurred'], 500);
+        }
+    }
+
+    public function search(Request $request){
+        try {
+            
+            $groups = DB::table('groups')
+            ->join('mentorships', 'groups.mentorship_id', '=', 'mentorships.id')
+            ->where('groups.title', 'like', "%" . $request->query('q') . "%")
+            ->select('groups.*', 'mentorships.image_url as mentorship_image_url')
+            ->get();
+
+            return response()->json([
+                'message' => 'success',
+                'data' => $groups
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 

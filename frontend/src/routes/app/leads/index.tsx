@@ -37,7 +37,12 @@ export default function LeadsPage() {
         {isError ? (
           <p>Ocorreu um erro ao carregar os leads</p>
         ) : (
-          <DataTable columns={columns} data={leads} isLoading={isLoading} />
+          <DataTable 
+            columns={columns({ onRefresh: fetchData })} 
+            data={leads} 
+            isLoading={isLoading}
+            onRefresh={fetchData}
+          />
         )}
       </div>
     </div>

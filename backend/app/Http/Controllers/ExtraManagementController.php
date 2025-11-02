@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\extra_management\CreateOrUpdateExtraRequest;
 use App\Models\Extra;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -106,6 +107,21 @@ class ExtraManagementController extends Controller
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => 'An unexpected error occurred'], 500);
+        }
+    }
+
+    public function search( Request $request )
+    {
+        try {
+
+            $extras = Extra::where('title', 'like', "%" . $request->query('q') . "%")->get();
+
+            return response()->json([
+                'message' => 'success',
+                'data' => $extras
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
