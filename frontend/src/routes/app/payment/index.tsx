@@ -16,13 +16,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/auth'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -577,17 +570,17 @@ export default function PaymentPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Tipo de documento</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o tipo de documento" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="cpf">CPF</SelectItem>
-                            <SelectItem value="cnpj">CNPJ</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <select
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <option value="">Selecione o tipo de documento</option>
+                            <option value="cpf">CPF</option>
+                            <option value="cnpj">CNPJ</option>
+                          </select>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -764,85 +757,42 @@ export default function PaymentPage() {
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>Estado</FormLabel>
-                                  <Select
-                                    key={`state-${field.value || 'empty'}`}
-                                    onValueChange={field.onChange}
-                                    defaultValue={field.value}
-                                    value={field.value}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Selecione o estado" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="AC">Acre</SelectItem>
-                                      <SelectItem value="AL">
-                                        Alagoas
-                                      </SelectItem>
-                                      <SelectItem value="AP">Amapá</SelectItem>
-                                      <SelectItem value="AM">
-                                        Amazonas
-                                      </SelectItem>
-                                      <SelectItem value="BA">Bahia</SelectItem>
-                                      <SelectItem value="CE">Ceará</SelectItem>
-                                      <SelectItem value="DF">
-                                        Distrito Federal
-                                      </SelectItem>
-                                      <SelectItem value="ES">
-                                        Espírito Santo
-                                      </SelectItem>
-                                      <SelectItem value="GO">Goiás</SelectItem>
-                                      <SelectItem value="MA">
-                                        Maranhão
-                                      </SelectItem>
-                                      <SelectItem value="MT">
-                                        Mato Grosso
-                                      </SelectItem>
-                                      <SelectItem value="MS">
-                                        Mato Grosso do Sul
-                                      </SelectItem>
-                                      <SelectItem value="MG">
-                                        Minas Gerais
-                                      </SelectItem>
-                                      <SelectItem value="PA">Pará</SelectItem>
-                                      <SelectItem value="PB">
-                                        Paraíba
-                                      </SelectItem>
-                                      <SelectItem value="PR">Paraná</SelectItem>
-                                      <SelectItem value="PE">
-                                        Pernambuco
-                                      </SelectItem>
-                                      <SelectItem value="PI">Piauí</SelectItem>
-                                      <SelectItem value="RJ">
-                                        Rio de Janeiro
-                                      </SelectItem>
-                                      <SelectItem value="RN">
-                                        Rio Grande do Norte
-                                      </SelectItem>
-                                      <SelectItem value="RS">
-                                        Rio Grande do Sul
-                                      </SelectItem>
-                                      <SelectItem value="RO">
-                                        Rondônia
-                                      </SelectItem>
-                                      <SelectItem value="RR">
-                                        Roraima
-                                      </SelectItem>
-                                      <SelectItem value="SC">
-                                        Santa Catarina
-                                      </SelectItem>
-                                      <SelectItem value="SP">
-                                        São Paulo
-                                      </SelectItem>
-                                      <SelectItem value="SE">
-                                        Sergipe
-                                      </SelectItem>
-                                      <SelectItem value="TO">
-                                        Tocantins
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                  <FormControl>
+                                    <select
+                                      value={field.value || ""}
+                                      onChange={field.onChange}
+                                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      <option value="">Selecione o estado</option>
+                                      <option value="AC">Acre</option>
+                                      <option value="AL">Alagoas</option>
+                                      <option value="AP">Amapá</option>
+                                      <option value="AM">Amazonas</option>
+                                      <option value="BA">Bahia</option>
+                                      <option value="CE">Ceará</option>
+                                      <option value="DF">Distrito Federal</option>
+                                      <option value="ES">Espírito Santo</option>
+                                      <option value="GO">Goiás</option>
+                                      <option value="MA">Maranhão</option>
+                                      <option value="MT">Mato Grosso</option>
+                                      <option value="MS">Mato Grosso do Sul</option>
+                                      <option value="MG">Minas Gerais</option>
+                                      <option value="PA">Pará</option>
+                                      <option value="PB">Paraíba</option>
+                                      <option value="PR">Paraná</option>
+                                      <option value="PE">Pernambuco</option>
+                                      <option value="PI">Piauí</option>
+                                      <option value="RJ">Rio de Janeiro</option>
+                                      <option value="RN">Rio Grande do Norte</option>
+                                      <option value="RS">Rio Grande do Sul</option>
+                                      <option value="RO">Rondônia</option>
+                                      <option value="RR">Roraima</option>
+                                      <option value="SC">Santa Catarina</option>
+                                      <option value="SP">São Paulo</option>
+                                      <option value="SE">Sergipe</option>
+                                      <option value="TO">Tocantins</option>
+                                    </select>
+                                  </FormControl>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -1008,32 +958,27 @@ export default function PaymentPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Quantidade de parcelas</FormLabel>
-                            <Select
-                              key={`installments-${field.value || 'empty'}`}
-                              onValueChange={field.onChange}
-                              defaultValue={field.value?.toString()}
-                              value={field.value?.toString()}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecione o número de parcelas" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="1">1 Parcela</SelectItem>
-                                <SelectItem value="2">2 Parcelas</SelectItem>
-                                <SelectItem value="3">3 Parcelas</SelectItem>
-                                <SelectItem value="4">4 Parcelas</SelectItem>
-                                <SelectItem value="5">5 Parcelas</SelectItem>
-                                <SelectItem value="6">6 Parcelas</SelectItem>
-                                <SelectItem value="7">7 Parcelas</SelectItem>
-                                <SelectItem value="8">8 Parcelas</SelectItem>
-                                <SelectItem value="9">9 Parcelas</SelectItem>
-                                <SelectItem value="10">10 Parcelas</SelectItem>
-                                <SelectItem value="11">11 Parcelas</SelectItem>
-                                <SelectItem value="12">12 Parcelas</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <FormControl>
+                              <select
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <option value="">Selecione o número de parcelas</option>
+                                <option value="1">1 Parcela</option>
+                                <option value="2">2 Parcelas</option>
+                                <option value="3">3 Parcelas</option>
+                                <option value="4">4 Parcelas</option>
+                                <option value="5">5 Parcelas</option>
+                                <option value="6">6 Parcelas</option>
+                                <option value="7">7 Parcelas</option>
+                                <option value="8">8 Parcelas</option>
+                                <option value="9">9 Parcelas</option>
+                                <option value="10">10 Parcelas</option>
+                                <option value="11">11 Parcelas</option>
+                                <option value="12">12 Parcelas</option>
+                              </select>
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1075,7 +1020,7 @@ export default function PaymentPage() {
                       </p>
                     ) : (
                         <span className="text-xl font-bold">
-                          {'  R$ ' + productInfo.price}
+                          {'  R$ ' + productInfo?.price}
                         </span>
                     )}
                   </div>
