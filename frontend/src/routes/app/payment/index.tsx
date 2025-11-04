@@ -99,7 +99,7 @@ const formSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.type_payment === 'credit_card') {
-      if (data.holder_name === undefined) {
+      if (!data.holder_name || data.holder_name.trim() === '') {
         ctx.addIssue({
           path: ['holder_name'],
           message: 'O nome do dono do cartão é necessário para prosseguir',
@@ -107,7 +107,7 @@ const formSchema = z
         })
       }
 
-      if (data.card_number === undefined) {
+      if (!data.card_number || data.card_number.trim() === '') {
         ctx.addIssue({
           path: ['card_number'],
           message: 'O número do cartão é necessário para prosseguir',
@@ -115,7 +115,7 @@ const formSchema = z
         })
       }
 
-      if (data.card_cvv === undefined) {
+      if (!data.card_cvv || data.card_cvv.trim() === '') {
         ctx.addIssue({
           path: ['card_cvv'],
           message: 'O código de segurança é necessário para prosseguir',
@@ -123,15 +123,7 @@ const formSchema = z
         })
       }
 
-      if (data.card_cvv === undefined) {
-        ctx.addIssue({
-          path: ['card_cvv'],
-          message: 'O código de segurança é necessário para prosseguir',
-          code: 'custom',
-        })
-      }
-
-      if (data.card_expiration_month === undefined) {
+      if (!data.card_expiration_month || data.card_expiration_month.trim() === '') {
         ctx.addIssue({
           path: ['card_expiration_month'],
           message: 'O mês de expiração do cartão é necessário para prosseguir',
@@ -139,7 +131,15 @@ const formSchema = z
         })
       }
 
-      if (data.card_holder_document_number === undefined) {
+      if (!data.card_expiration_year || data.card_expiration_year.trim() === '') {
+        ctx.addIssue({
+          path: ['card_expiration_year'],
+          message: 'O ano de expiração do cartão é necessário para prosseguir',
+          code: 'custom',
+        })
+      }
+
+      if (!data.card_holder_document_number || data.card_holder_document_number.trim() === '') {
         ctx.addIssue({
           path: ['card_holder_document_number'],
           message:
@@ -148,7 +148,7 @@ const formSchema = z
         })
       }
 
-      if (data.card_installments === undefined) {
+      if (!data.card_installments || data.card_installments.trim() === '') {
         ctx.addIssue({
           path: ['card_installments'],
           message:
@@ -178,13 +178,41 @@ export default function PaymentPage() {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    defaultValues: {
+      first_name: '',
+      last_name: '',
+      phone: '',
+      email: user?.email || '',
+      document_type: '',
+      document_number: '',
+      postcode: '',
+      street: '',
+      number: '',
+      complement: '',
+      district: '',
+      city: '',
+      state: '',
+      type_payment: '',
+      holder_name: '',
+      card_number: '',
+      card_cvv: '',
+      card_expiration_month: '',
+      card_expiration_year: '',
+      card_holder_document_number: '',
+      card_installments: '',
+      accept_terms: false,
+    },
   })
-
-  form.setValue('email', user?.email as string)
 
   const watchDocumentType = form.watch('document_type')
   const watchCep = form.watch('postcode')
   const watchPaymentType = form.watch('type_payment')
+
+  useEffect(() => {
+    if (user?.email) {
+      form.setValue('email', user.email)
+    }
+  }, [user, form])
 
   async function fetchData() {
     setIsLoading(true)
@@ -254,13 +282,20 @@ export default function PaymentPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
+    
+    const cleanPhone = (values.phone || '').replace(/\D/g, '')
+    const cleanDocumentNumber = (values.document_number || '').replace(/\D/g, '')
+    const cleanPostcode = (values.postcode || '').replace(/\D/g, '')
+    const cleanCardNumber = (values.card_number || '').replace(/\s/g, '')
+    const cleanHolderDocument = (values.card_holder_document_number || '').replace(/\D/g, '')
+    
     const dataPayment = {
-      first_name: values.first_name,
-      last_name: values.last_name,
-      phone: values.phone.trim(),
-      email: values.email,
+      first_name: values.first_name.trim(),
+      last_name: values.last_name.trim(),
+      phone: cleanPhone,
+      email: values.email.trim(),
       document_type: values.document_type,
-      document_number: values.document_number,
+      document_number: cleanDocumentNumber,
       order: {
         type_product: getTypeProductPayment(),
         product_id: productInfo?.id,
@@ -272,22 +307,19 @@ export default function PaymentPage() {
         values.type_payment !== 'credit_card'
           ? null
           : {
-              number: values.card_number?.replace(/ /g, ''),
+              number: cleanCardNumber,
               cvv: values.card_cvv,
               expiration_month: values.card_expiration_month,
               expiration_year: values.card_expiration_year,
-              holder_document_number: values.card_holder_document_number,
+              holder_document_number: cleanHolderDocument,
               holder_name: values.holder_name,
-              installments:
-                values.card_installments === undefined
-                  ? 0
-                  : parseInt(values.card_installments),
+              installments: parseInt(values.card_installments || '1', 10),
             },
       address: {
-        postcode: values.postcode.trim().replace(/\D/g, ''),
+        postcode: cleanPostcode,
         street: values.street,
         number: values.number,
-        complement: values.complement,
+        complement: values.complement || '',
         district: values.district,
         city: values.city,
         state: values.state,
@@ -297,12 +329,10 @@ export default function PaymentPage() {
     try {
       const { data } = await api.post('/payments/create', dataPayment)
       navigate(`/payment/info/${data.payment_id}`)
-    } catch(error) {
-
+    } catch(error: any) {
       toast.error(
-        error.status === 400
-          ? error.response.data.error
-          :'Não foi possível realizar o pagamento devido a um erro inesperado. Por favor, tente novamente mais tarde',
+        error?.response?.data?.error ||
+        'Não foi possível realizar o pagamento devido a um erro inesperado. Por favor, tente novamente mais tarde',
       )
     } finally {
       setIsLoading(false)
@@ -486,7 +516,7 @@ export default function PaymentPage() {
   return (
     <div className="sm:p-14 mb-16">
       <Form {...form}>
-        <form id="makePayment" onSubmit={form.handleSubmit(onSubmit)}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
           <div className="flex flex-col gap-4 sm:flex-row">
             <div className="sm:pe-12 sm:w-[70%]">
               <div>
@@ -563,7 +593,6 @@ export default function PaymentPage() {
                             readOnly
                             placeholder="exemplo@gmail.com"
                             {...field}
-                            value={user?.email}
                           />
                         </FormControl>
                         <FormMessage />
@@ -579,8 +608,10 @@ export default function PaymentPage() {
                       <FormItem>
                         <FormLabel>Tipo de documento</FormLabel>
                         <Select
+                          key={`document-type-${field.value || 'empty'}`}
                           onValueChange={field.onChange}
                           defaultValue={field.value}
+                          value={field.value}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -769,8 +800,10 @@ export default function PaymentPage() {
                                 <FormItem>
                                   <FormLabel>Estado</FormLabel>
                                   <Select
+                                    key={`state-${field.value || 'empty'}`}
                                     onValueChange={field.onChange}
                                     defaultValue={field.value}
+                                    value={field.value}
                                   >
                                     <FormControl>
                                       <SelectTrigger>
@@ -1059,8 +1092,10 @@ export default function PaymentPage() {
                           <FormItem>
                             <FormLabel>Quantidade de parcelas</FormLabel>
                             <Select
+                              key={`installments-${field.value || 'empty'}`}
                               onValueChange={field.onChange}
                               defaultValue={field.value?.toString()}
+                              value={field.value?.toString()}
                             >
                               <FormControl>
                                 <SelectTrigger>
@@ -1123,7 +1158,7 @@ export default function PaymentPage() {
                       </p>
                     ) : (
                         <span className="text-xl font-bold">
-                          {'  R$ ' + productInfo.price}
+                          {'  R$ ' + productInfo?.price}
                         </span>
                     )}
                   </div>
@@ -1171,8 +1206,6 @@ export default function PaymentPage() {
                   </div>
                   <div className="mb-5">
                     <Button
-                      onClick={form.handleSubmit(onSubmit)}
-                      form="makePayment"
                       type="submit"
                       disabled={isLoading}
                       className="w-full"
