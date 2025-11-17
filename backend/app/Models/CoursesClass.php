@@ -120,6 +120,9 @@ class CoursesClass extends Model
             if( $this->video_url )
                 return $this->video_url;
 
+            if($videoId === 'panda-xxx')
+                return "";
+            
             $pandaService = app(\App\Classes\PandaVideo\PandaVideo::class);
             $this->video_url = $pandaService->getVideoUrl( $videoId );
 
