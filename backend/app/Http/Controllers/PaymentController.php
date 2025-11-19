@@ -377,6 +377,15 @@ class PaymentController extends Controller
 
             Log::error("[PaymentController::createPayment] Error: " . $e->getMessage() . " | Line: " . $e->getLine() . " | File: " . $e->getFile());
 
+            if ($e instanceof \GuzzleHttp\Exception\ClientException && $e->hasResponse()) {
+                $response = json_decode($e->getResponse()->getBody()->getContents(), true);
+
+                if (isset($response['text'])) {
+                    $errorMessage = $response['text']; // mensagem REAL do gateway
+                    $statusCode = 400;
+                }
+            }
+
             // Determinar tipo de erro e retornar mensagem apropriada
             $errorMessage = 'Não foi possível processar o pagamento. Por favor, tente novamente.';
             $statusCode = 500;
