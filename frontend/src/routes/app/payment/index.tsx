@@ -427,23 +427,7 @@ export default function PaymentPage() {
     } catch (error: any) {
       console.error('[PaymentPage] Error submitting payment:', error)
 
-      let message = 'Erro ao processar pagamento. Tente novamente.'
-
-      if (error.name === 'AbortError') {
-        message = 'Tempo esgotado. Verifique sua conexão e tente novamente.'
-      } else if (!navigator.onLine) {
-        message = 'Sem conexão com a internet'
-      } else if (error.response?.status === 400) {
-        message = error.response.data?.error || 'Dados inválidos'
-      } else if (error.response?.status === 403) {
-        message = 'Você já possui este produto'
-      } else if (error.response?.status === 422) {
-        message = 'Verifique os dados do cartão e tente novamente'
-      } else if (error.response?.status >= 500) {
-        message = 'Erro no servidor. Tente novamente em alguns instantes.'
-      }
-
-      toast.error(message)
+      toast.error(error.response?.data.error)
     } finally {
       setIsSubmitting(false)
     }
