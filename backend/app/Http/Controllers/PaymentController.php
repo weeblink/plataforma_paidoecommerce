@@ -6,6 +6,7 @@ use App\Classes\Payments\DocumentValidator;
 use App\Http\Requests\payments\CreatePaymentRequest;
 use App\Models\Payment;
 use App\Models\UserProduct;
+use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -287,49 +288,116 @@ class PaymentController extends Controller
     public function createPayment(CreatePaymentRequest $request): \Illuminate\Http\JsonResponse
     {
         DB::beginTransaction();
+        
         try {
-
-            $params = $request->all();
+            $params = $request->validated();
             $params['ip'] = $request->ip();
+            $user = $request->user();
 
-            $productColumnId = UserProduct::getProductColumn($params['order']['type_product']);
+            // Validar se usuário está autenticado
+            if (!$user) {
+                return response()->json([
+                    'error' => 'Usuário não autenticado'
+                ], 401);
+            }
 
+            // Validar tipo de produto
+            $validProductTypes = ['course', 'extra', 'mentorship'];
+            if (!in_array($params['order']['type_product'], $validProductTypes)) {
+                return response()->json([
+                    'error' => 'Tipo de produto inválido'
+                ], 400);
+            }
+
+            // Obter coluna do produto
+            try {
+                $productColumnId = UserProduct::getProductColumn($params['order']['type_product']);
+            } catch (Exception $e) {
+                Log::error("[PaymentController] Invalid product type: " . $e->getMessage());
+                return response()->json([
+                    'error' => 'Tipo de produto inválido'
+                ], 400);
+            }
+
+            // Verificar se usuário já possui o produto
             $userProduct = UserProduct::where($productColumnId, $params['order']['product_id'])
-                ->where('user_id', $request->user()->id)
+                ->where('user_id', $user->id)
                 ->first();
 
-            if (!empty($userProduct))
-                return response()->json(['error' => "O produto já foi comprado anteriormente pelo usuário"], 403);
+            if ($userProduct) {
+                return response()->json([
+                    'error' => 'Você já possui este produto'
+                ], 403);
+            }
 
-            if( ! DocumentValidator::validate( $params['document_number'], $params['document_type'] ) )
-                return response()->json(['error' => "O número do documento informado é inválido"], 400);
+            // Validar documento
+            if (!DocumentValidator::validate($params['document_number'], $params['document_type'])) {
+                return response()->json([
+                    'error' => 'O número do documento informado é inválido'
+                ], 400);
+            }
 
+            // Validar documento do titular do cartão (se aplicável)
+            if (
+                $params['order']['type_payment'] === 'credit_card' && 
+                isset($params['card']['holder_document_number'])
+            ) {
+                if (!DocumentValidator::validate($params['card']['holder_document_number'], 'cpf')) {
+                    return response()->json([
+                        'error' => 'O CPF do titular do cartão é inválido'
+                    ], 400);
+                }
+            }
+
+            // Criar pagamento
             $payment = new Payment();
-            $paymentId = $payment->createNewPayment($params, $request->user()->id);
+            
+            try {
+                $paymentId = $payment->createNewPayment($params, $user->id);
+            } catch (GuzzleException $e) {
+                Log::error("[PaymentController] Guzzle error: " . $e->getMessage());
+                
+                // Erros específicos de gateway
+                if (strpos($e->getMessage(), 'Connection') !== false) {
+                    throw new Exception('Erro de conexão com o processador de pagamento. Tente novamente.');
+                }
+                
+                throw new Exception('Erro ao processar pagamento no gateway');
+            }
 
             DB::commit();
 
             return response()->json([
-                'message'       => 'success',
-                'payment_id'          => $paymentId
+                'message' => 'success',
+                'payment_id' => $paymentId
             ], 201);
-        } catch (\Exception $e) {
 
+        } catch (Exception $e) {
             DB::rollback();
 
-            Log::error("[PaymentController]: " . $e->getMessage() . " | " . $e->getLine() . " | " . $e->getFile());
+            Log::error("[PaymentController::createPayment] Error: " . $e->getMessage() . " | Line: " . $e->getLine() . " | File: " . $e->getFile());
+
+            // Determinar tipo de erro e retornar mensagem apropriada
+            $errorMessage = 'Não foi possível processar o pagamento. Por favor, tente novamente.';
+            $statusCode = 500;
+
+            // Erros conhecidos
+            if (strpos($e->getMessage(), 'gateway') !== false) {
+                $errorMessage = 'Erro ao comunicar com o processador de pagamento. Tente novamente em alguns instantes.';
+            } elseif (strpos($e->getMessage(), 'App checkout not found') !== false) {
+                $errorMessage = 'Sistema de pagamento não configurado. Entre em contato com o suporte.';
+                $statusCode = 503;
+            } elseif (strpos($e->getMessage(), 'Product not found') !== false) {
+                $errorMessage = 'Produto não encontrado';
+                $statusCode = 404;
+            } elseif (strpos($e->getMessage(), 'Customer') !== false) {
+                $errorMessage = 'Erro ao processar informações do cliente. Verifique os dados e tente novamente.';
+                $statusCode = 400;
+            }
 
             return response()->json([
-                'error' => "An unexpected error has occurred"
-            ], 500);
-        } catch (GuzzleException $e) {
-            DB::rollback();
-
-            Log::error("[PaymentController]: " . $e->getMessage());
-
-            return response()->json([
-                'error' => "An unexpected error has occurred"
-            ], 500);
+                'error' => $errorMessage
+            ], $statusCode);
         }
     }
 

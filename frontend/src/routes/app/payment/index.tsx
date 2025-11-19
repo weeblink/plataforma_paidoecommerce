@@ -16,8 +16,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/auth'
+import { DocumentValidator } from '@/lib/document-validator'
+import { CardValidator } from '@/lib/card-validator'
+import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export enum TypeUrl {
@@ -34,50 +36,40 @@ export interface PaymentProductInfo {
   image_url: string
 }
 
+// Schema de validação melhorado
 const formSchema = z
   .object({
-    first_name: z.string({
-      required_error: 'O primeiro nome é obrigatório',
-    }),
-    last_name: z.string({
-      required_error: 'O segundo nome é necessário',
-    }),
-    phone: z.string({
-      required_error: 'O campo de telefone é obrigatório para prosseguir',
-    }),
-    email: z.string({
-      required_error: 'O campo de email é necessário para prosseguir',
-    }),
-    document_type: z.string({
-      required_error:
-        'O campo de tipo de documento é necessário para prosseguir',
+    first_name: z
+      .string({ required_error: 'O primeiro nome é obrigatório' })
+      .min(2, 'Nome deve ter pelo menos 2 caracteres')
+      .max(50, 'Nome muito longo'),
+    last_name: z
+      .string({ required_error: 'O sobrenome é obrigatório' })
+      .min(2, 'Sobrenome deve ter pelo menos 2 caracteres')
+      .max(50, 'Sobrenome muito longo'),
+    phone: z
+      .string({ required_error: 'O telefone é obrigatório' })
+      .regex(/^\(\d{2}\) \d{5}-\d{4}$/, 'Telefone inválido'),
+    email: z
+      .string({ required_error: 'O email é obrigatório' })
+      .email('Email inválido'),
+    document_type: z.enum(['cpf', 'cnpj'], {
+      required_error: 'Selecione o tipo de documento',
     }),
     document_number: z.string({
-      required_error:
-        'O campo de número do documento é necessário para prosseguir',
+      required_error: 'O número do documento é obrigatório',
     }),
-    postcode: z.string({
-      required_error: 'O campo de CEP é necessário pra prosseguir',
-    }),
-    street: z.string({
-      required_error: 'O campo de rua é necessário pra prosseguir',
-    }),
-    number: z.string({
-      required_error: 'O campo de número é necessário para prosseguir',
-    }),
+    postcode: z
+      .string({ required_error: 'O CEP é obrigatório' })
+      .regex(/^\d{5}-\d{3}$/, 'CEP inválido'),
+    street: z.string({ required_error: 'A rua é obrigatória' }).min(3),
+    number: z.string({ required_error: 'O número é obrigatório' }).min(1),
     complement: z.string().optional(),
-    district: z.string({
-      required_error: 'O campo de Bairro é necessário para prosseguir',
-    }),
-    city: z.string({
-      required_error: 'O campo de Cidade é necessário para prosseguir',
-    }),
-    state: z.string({
-      required_error: 'O campo de Estado é necessário para prosseguir',
-    }),
-    type_payment: z.string({
-      required_error:
-        'O campo de tipo de pagamento é necessário para prosseguir',
+    district: z.string({ required_error: 'O bairro é obrigatório' }).min(2),
+    city: z.string({ required_error: 'A cidade é obrigatória' }).min(2),
+    state: z.string({ required_error: 'O estado é obrigatório' }).length(2),
+    type_payment: z.enum(['credit_card', 'invoice', 'pix'], {
+      required_error: 'Selecione o tipo de pagamento',
     }),
     holder_name: z.string().optional(),
     card_number: z.string().optional(),
@@ -86,67 +78,135 @@ const formSchema = z
     card_expiration_year: z.string().optional(),
     card_holder_document_number: z.string().optional(),
     card_installments: z.string().optional(),
-    accept_terms: z.boolean({
-      required_error:
-        'O campo de aceitação dos termos é necessário para prosseguir',
+    accept_terms: z.boolean().refine((val) => val === true, {
+      message: 'Você deve aceitar os termos',
     }),
   })
+  .refine(
+    (data) => {
+      // Valida documento
+      if (!data.document_number || !data.document_type) return false
+      const validation = DocumentValidator.validate(
+        data.document_number,
+        data.document_type
+      )
+      return validation.isValid
+    },
+    {
+      message: 'Documento inválido',
+      path: ['document_number'],
+    }
+  )
   .superRefine((data, ctx) => {
+    // Validações específicas para cartão de crédito
     if (data.type_payment === 'credit_card') {
-      if (data.holder_name === undefined) {
+      // Validar nome do titular
+      if (!data.holder_name || data.holder_name.trim().length < 3) {
         ctx.addIssue({
           path: ['holder_name'],
-          message: 'O nome do dono do cartão é necessário para prosseguir',
+          message: 'Nome do titular é obrigatório',
           code: 'custom',
         })
       }
 
-      if (data.card_number === undefined) {
+      // Validar número do cartão
+      if (!data.card_number) {
         ctx.addIssue({
           path: ['card_number'],
-          message: 'O número do cartão é necessário para prosseguir',
+          message: 'Número do cartão é obrigatório',
           code: 'custom',
         })
+      } else {
+        const cardValidation = CardValidator.validateCardNumber(data.card_number)
+        if (!cardValidation.isValid) {
+          ctx.addIssue({
+            path: ['card_number'],
+            message: cardValidation.error || 'Número do cartão inválido',
+            code: 'custom',
+          })
+        }
       }
 
-      if (data.card_cvv === undefined) {
+      // Validar CVV
+      if (!data.card_cvv) {
         ctx.addIssue({
           path: ['card_cvv'],
-          message: 'O código de segurança é necessário para prosseguir',
+          message: 'CVV é obrigatório',
           code: 'custom',
         })
+      } else {
+        const cardType = data.card_number
+          ? CardValidator.getCardType(data.card_number)
+          : undefined
+        const cvvValidation = CardValidator.validateCVV(
+          data.card_cvv,
+          cardType || undefined
+        )
+        if (!cvvValidation.isValid) {
+          ctx.addIssue({
+            path: ['card_cvv'],
+            message: cvvValidation.error || 'CVV inválido',
+            code: 'custom',
+          })
+        }
       }
 
-      if (data.card_cvv === undefined) {
-        ctx.addIssue({
-          path: ['card_cvv'],
-          message: 'O código de segurança é necessário para prosseguir',
-          code: 'custom',
-        })
+      // Validar data de expiração
+      if (!data.card_expiration_month || !data.card_expiration_year) {
+        if (!data.card_expiration_month) {
+          ctx.addIssue({
+            path: ['card_expiration_month'],
+            message: 'Mês de expiração é obrigatório',
+            code: 'custom',
+          })
+        }
+        if (!data.card_expiration_year) {
+          ctx.addIssue({
+            path: ['card_expiration_year'],
+            message: 'Ano de expiração é obrigatório',
+            code: 'custom',
+          })
+        }
+      } else {
+        const expirationValidation = CardValidator.validateExpiration(
+          data.card_expiration_month,
+          data.card_expiration_year
+        )
+        if (!expirationValidation.isValid) {
+          ctx.addIssue({
+            path: ['card_expiration_month'],
+            message: expirationValidation.error || 'Data de expiração inválida',
+            code: 'custom',
+          })
+        }
       }
 
-      if (data.card_expiration_month === undefined) {
-        ctx.addIssue({
-          path: ['card_expiration_month'],
-          message: 'O mês de expiração do cartão é necessário para prosseguir',
-          code: 'custom',
-        })
-      }
-
-      if (data.card_holder_document_number === undefined) {
+      // Validar CPF do titular
+      if (!data.card_holder_document_number) {
         ctx.addIssue({
           path: ['card_holder_document_number'],
-          message:
-            'O número do documento do dono do cartão é necessário para prosseguir',
+          message: 'CPF do titular é obrigatório',
           code: 'custom',
         })
+      } else {
+        const docValidation = DocumentValidator.validate(
+          data.card_holder_document_number,
+          'cpf'
+        )
+        if (!docValidation.isValid) {
+          ctx.addIssue({
+            path: ['card_holder_document_number'],
+            message: docValidation.error || 'CPF do titular inválido',
+            code: 'custom',
+          })
+        }
       }
 
-      if (data.card_installments === undefined) {
+      // Validar parcelas
+      if (!data.card_installments) {
         ctx.addIssue({
           path: ['card_installments'],
-          message:
-            'É necessário informar a quantidade de parcelas para prosseguir',
+          message: 'Selecione o número de parcelas',
           code: 'custom',
         })
       }
@@ -159,11 +219,13 @@ export default function PaymentPage() {
 
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingCep, setIsLoadingCep] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [isError, setIsError] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   const [productInfo, setProductInfo] = useState<PaymentProductInfo | null>(
-    null,
+    null
   )
 
   const navigate = useNavigate()
@@ -172,6 +234,7 @@ export default function PaymentPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       email: user?.email || '',
+      accept_terms: false,
     },
   })
 
@@ -180,6 +243,8 @@ export default function PaymentPage() {
   const paymentType = form.watch('type_payment')
 
   const prevCepRef = useRef<string | null>(null)
+
+  // Buscar CEP automaticamente
   useEffect(() => {
     if (watchCep && watchCep.length === 9 && watchCep !== prevCepRef.current) {
       prevCepRef.current = watchCep
@@ -187,136 +252,210 @@ export default function PaymentPage() {
     }
   }, [watchCep])
 
+  // Buscar dados do produto
   async function fetchData() {
     setIsLoading(true)
+    setIsError(false)
+    setErrorMessage('')
+
     try {
       let info: PaymentProductInfo = {} as PaymentProductInfo
 
-      if (type === TypeUrl.Course) {
-        const { data } = await api.get<{ data: PaymentProductInfo }>(
-          `/courses/${id}/payment`,
-        )
-
-        info = data.data
+      const endpoints = {
+        [TypeUrl.Course]: `/courses/${id}/payment`,
+        [TypeUrl.Mentoring]: `/mentorings/${id}/payment`,
+        [TypeUrl.Extra]: `/extras/${id}/payment`,
       }
 
-      if (type === TypeUrl.Mentoring) {
-        const { data } = await api.get<{ data: PaymentProductInfo }>(
-          `/mentorings/${id}/payment`,
-        )
+      const endpoint = endpoints[type as TypeUrl]
 
-        info = data.data
+      if (!endpoint) {
+        throw new Error('Tipo de produto inválido')
       }
 
-      if (type === TypeUrl.Extra) {
-        const { data } = await api.get<{ data: PaymentProductInfo }>(
-          `/extras/${id}/payment`,
-        )
+      const { data } = await api.get<{ data: PaymentProductInfo }>(endpoint)
+      info = data.data
 
-        info = data.data
-      }
-
-      if (Object.keys(info).length === 0) {
-        toast.error('Ocorreu um erro ao carregar os detalhes de pagamento')
-        setIsError(true)
-        return
+      if (!info || Object.keys(info).length === 0) {
+        throw new Error('Produto não encontrado')
       }
 
       setProductInfo(info)
-    } catch {
-      let typeText = ''
-      if (type === TypeUrl.Course) typeText = 'do curso'
-      if (type === TypeUrl.Mentoring) typeText = 'da mentoria'
-      if (type === TypeUrl.Extra) typeText = 'do produto'
+    } catch (error: any) {
+      console.error('[PaymentPage] Error fetching product:', error)
 
-      toast.error(`Ocorreu um erro ao carregar os detalhes ${typeText}`)
+      let message = 'Erro ao carregar informações do produto'
+
+      if (error.response?.status === 404) {
+        message = 'Produto não encontrado'
+      } else if (error.response?.status === 403) {
+        message = 'Você não tem permissão para acessar este produto'
+      } else if (!navigator.onLine) {
+        message = 'Sem conexão com a internet. Verifique sua conexão e tente novamente.'
+      }
+
+      setErrorMessage(message)
       setIsError(true)
+      toast.error(message)
     } finally {
       setIsLoading(false)
     }
   }
 
+  // Buscar dados do CEP
   async function searchCepData(cep: string) {
     setIsLoadingCep(true)
+
     try {
-      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`, {
-        headers: { 'Accept': 'application/json' },
-        cache: 'no-store',
+      const cleanCep = cep.replace(/\D/g, '')
+
+      if (cleanCep.length !== 8) {
+        throw new Error('CEP inválido')
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
+
+      const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`, {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
       })
-      if (!res.ok) throw new Error(`viacep ${res.status}`)
+
+      clearTimeout(timeoutId)
+
+      if (!res.ok) {
+        throw new Error(`Erro ao buscar CEP: ${res.status}`)
+      }
+
       const response = await res.json()
-      if (response.erro) throw new Error('CEP inválido')
-      form.setValue('street', response.logradouro ?? '')
-      form.setValue('district', response.bairro ?? '')
-      form.setValue('city', response.localidade ?? '')
-      form.setValue('state', response.uf ?? '')
-    } catch (e: any) {
-      toast.error('Não foi possível localizar o endereço do CEP informado')
+
+      if (response.erro) {
+        throw new Error('CEP não encontrado')
+      }
+
+      // Preencher campos
+      form.setValue('street', response.logradouro || '')
+      form.setValue('district', response.bairro || '')
+      form.setValue('city', response.localidade || '')
+      form.setValue('state', response.uf || '')
+
+      // Limpar erros anteriores
+      form.clearErrors(['street', 'district', 'city', 'state'])
+    } catch (error: any) {
+      console.error('[PaymentPage] Error fetching CEP:', error)
+
+      let message = 'Não foi possível localizar o endereço do CEP informado'
+
+      if (error.name === 'AbortError') {
+        message = 'Tempo esgotado ao buscar CEP. Tente novamente.'
+      } else if (!navigator.onLine) {
+        message = 'Sem conexão com a internet'
+      }
+
+      toast.error(message)
     } finally {
       setIsLoadingCep(false)
     }
   }
 
+  // Enviar pagamento
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsLoading(true)
-    const dataPayment = {
-      first_name: values.first_name,
-      last_name: values.last_name,
-      phone: values.phone.trim(),
-      email: values.email,
-      document_type: values.document_type,
-      document_number: values.document_number,
-      order: {
-        type_product: getTypeProductPayment(),
-        product_id: productInfo?.id,
-        discount_value: 0,
-        shipping_value: 0,
-        type_payment: values.type_payment,
-      },
-      card:
-        values.type_payment !== 'credit_card'
-          ? null
-          : {
-              number: values.card_number?.replace(/ /g, ''),
-              cvv: values.card_cvv,
-              expiration_month: values.card_expiration_month,
-              expiration_year: values.card_expiration_year,
-              holder_document_number: values.card_holder_document_number,
-              holder_name: values.holder_name,
-              installments:
-                values.card_installments === undefined
-                  ? 0
-                  : parseInt(values.card_installments),
-            },
-      address: {
-        postcode: values.postcode.trim().replace(/\D/g, ''),
-        street: values.street,
-        number: values.number,
-        complement: values.complement,
-        district: values.district,
-        city: values.city,
-        state: values.state,
-      },
+    // Validação final antes de enviar
+    if (!productInfo) {
+      toast.error('Informações do produto não carregadas')
+      return
     }
 
+    setIsSubmitting(true)
+
     try {
-      const { data } = await api.post('/payments/create', dataPayment)
+      // Preparar dados do pagamento
+      const dataPayment = {
+        first_name: values.first_name.trim(),
+        last_name: values.last_name.trim(),
+        phone: values.phone.replace(/\D/g, ''),
+        email: values.email.trim().toLowerCase(),
+        document_type: values.document_type,
+        document_number: DocumentValidator.cleanDocument(values.document_number),
+        order: {
+          type_product: getTypeProductPayment(),
+          product_id: productInfo.id,
+          discount_value: 0,
+          shipping_value: 0,
+          type_payment: values.type_payment,
+        },
+        card:
+          values.type_payment !== 'credit_card'
+            ? null
+            : {
+                number: CardValidator.cleanCardNumber(values.card_number || ''),
+                cvv: values.card_cvv?.replace(/\D/g, ''),
+                expiration_month: values.card_expiration_month,
+                expiration_year: values.card_expiration_year,
+                holder_document_number: DocumentValidator.cleanDocument(
+                  values.card_holder_document_number || ''
+                ),
+                holder_name: values.holder_name?.trim(),
+                installments: values.card_installments
+                  ? parseInt(values.card_installments)
+                  : 1,
+              },
+        address: {
+          postcode: values.postcode.replace(/\D/g, ''),
+          street: values.street.trim(),
+          number: values.number.trim(),
+          complement: values.complement?.trim() || '',
+          district: values.district.trim(),
+          city: values.city.trim(),
+          state: values.state,
+        },
+      }
+
+      // Timeout para a requisição
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s
+
+      const { data } = await api.post('/payments/create', dataPayment, {
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      // Sucesso
+      toast.success('Pagamento processado com sucesso!')
       navigate(`/payment/info/${data.payment_id}`)
     } catch (error: any) {
-      const status = error?.response?.status
-      const msg = status === 400
-        ? error?.response?.data?.error
-        : 'Não foi possível realizar o pagamento devido a um erro inesperado. Por favor, tente novamente mais tarde'
-      toast.error(msg)
+      console.error('[PaymentPage] Error submitting payment:', error)
+
+      let message = 'Erro ao processar pagamento. Tente novamente.'
+
+      if (error.name === 'AbortError') {
+        message = 'Tempo esgotado. Verifique sua conexão e tente novamente.'
+      } else if (!navigator.onLine) {
+        message = 'Sem conexão com a internet'
+      } else if (error.response?.status === 400) {
+        message = error.response.data?.error || 'Dados inválidos'
+      } else if (error.response?.status === 403) {
+        message = 'Você já possui este produto'
+      } else if (error.response?.status === 422) {
+        message = 'Verifique os dados do cartão e tente novamente'
+      } else if (error.response?.status >= 500) {
+        message = 'Erro no servidor. Tente novamente em alguns instantes.'
+      }
+
+      toast.error(message)
     } finally {
-      setIsLoading(false)
+      setIsSubmitting(false)
     }
   }
 
   function getTypeProductPayment() {
-    if (type === TypeUrl.Course) return 'course'
-    if (type === TypeUrl.Mentoring) return 'mentorship'
-    if (type === TypeUrl.Extra) return 'extra'
+    const typeMap = {
+      [TypeUrl.Course]: 'course',
+      [TypeUrl.Mentoring]: 'mentorship',
+      [TypeUrl.Extra]: 'extra',
+    }
+    return typeMap[type as TypeUrl] || 'course'
   }
 
   useEffect(() => {
@@ -463,14 +602,17 @@ export default function PaymentPage() {
 
   if (isError) {
     return (
-      <div className="mt-4">
-        <p>Ocorreu um erro ao carregar os detalhes do curso</p>
-        <a href="/">
-          <Button variant="secondary" size="sm" className="mt-4 bg-primary">
-            <Home />
-            <span className="ps-2">Home</span>
-          </Button>
-        </a>
+      <div className="mt-4 p-14 text-center">
+        <p className="mb-4 text-lg text-destructive">{errorMessage}</p>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="bg-primary"
+          onClick={() => window.location.href = '/'}
+        >
+          <Home className="mr-2" />
+          <span>Voltar para Home</span>
+        </Button>
       </div>
     )
   }
@@ -479,8 +621,9 @@ export default function PaymentPage() {
     <div className="sm:p-14 mb-16">
       <Form {...form}>
         <form id="makePayment" onSubmit={form.handleSubmit(onSubmit)}>
+          {/* Resto do formulário mantém igual ao original, apenas adicione disabled quando isSubmitting */}
           <div className="flex flex-col gap-4 sm:flex-row">
-            <div className="sm:pe-12 sm:w-[70%]">
+             <div className="sm:pe-12 sm:w-[70%]">
               <div>
                 <h2 className="mb-5 font-poppins text-2xl font-medium">
                   Informações pessoais
@@ -988,19 +1131,22 @@ export default function PaymentPage() {
                 )}
               </div>
             </div>
+            
             <div className="sm:w-[30%]">
               <div className="border-1 flex flex-col justify-between rounded-lg border bg-card p-5 text-card-foreground">
+                {/* Informações do produto */}
                 <div>
                   <div className="mb-5">
                     <div
                       className="h-[400px] rounded-lg"
                       style={{
                         backgroundPosition: 'center',
-                        backgroundImage: `url( ${productInfo?.image_url} )`,
+                        backgroundImage: `url(${productInfo?.image_url})`,
                         backgroundSize: 'contain',
+                        backgroundRepeat: 'no-repeat',
                         position: 'relative',
                       }}
-                    ></div>
+                    />
                   </div>
                   <div className="mb-5">
                     <h5 className="text-2xl font-extrabold text-primary">
@@ -1015,16 +1161,18 @@ export default function PaymentPage() {
                           R$ {productInfo.price}
                         </span>
                         <span className="text-xl font-bold">
-                          {'  R$ ' + productInfo.promotional_price}
+                          {' R$ ' + productInfo.promotional_price}
                         </span>
                       </p>
                     ) : (
-                        <span className="text-xl font-bold">
-                          {'  R$ ' + productInfo?.price}
-                        </span>
+                      <span className="text-xl font-bold">
+                        {'R$ ' + productInfo?.price}
+                      </span>
                     )}
                   </div>
                 </div>
+
+                {/* Termos e botão */}
                 <div className="mt-14">
                   <div className="mb-5">
                     <FormField
@@ -1035,9 +1183,8 @@ export default function PaymentPage() {
                           <input
                             type="checkbox"
                             checked={field.value}
-                            onChange={(e) => {
-                              field.onChange(e.target.checked)
-                            }}
+                            onChange={(e) => field.onChange(e.target.checked)}
+                            disabled={isSubmitting}
                             className="mt-1"
                           />
                           <div className="space-y-1">
@@ -1046,6 +1193,8 @@ export default function PaymentPage() {
                               <a
                                 href="/payment/terms-and-conditions"
                                 className="text-blue-600 underline hover:text-blue-800"
+                                target="_blank"
+                                rel="noopener noreferrer"
                               >
                                 termos de compra
                               </a>{' '}
@@ -1053,6 +1202,8 @@ export default function PaymentPage() {
                               <a
                                 href="/payment/privacy-politcs"
                                 className="text-blue-600 underline hover:text-blue-800"
+                                target="_blank"
+                                rel="noopener noreferrer"
                               >
                                 política de privacidade
                               </a>
@@ -1062,20 +1213,24 @@ export default function PaymentPage() {
                         </div>
                       )}
                     />
+                    {form.formState.errors.accept_terms && (
+                      <p className="mt-2 text-sm text-destructive">
+                        {form.formState.errors.accept_terms.message}
+                      </p>
+                    )}
                   </div>
-                  <div>
-                    <div className="my-4 w-full border-t border-gray-200" />
-                  </div>
+                  <div className="my-4 w-full border-t border-gray-200" />
                   <div className="mb-5">
                     <Button
-                      onClick={form.handleSubmit(onSubmit)}
-                      form="makePayment"
                       type="submit"
-                      disabled={isLoading}
+                      disabled={isSubmitting || !form.formState.isValid}
                       className="w-full"
                     >
-                      {isLoading ? (
-                        <LoaderCircle className="h-4 w-4 animate-spin text-white" />
+                      {isSubmitting ? (
+                        <>
+                          <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                          Processando...
+                        </>
                       ) : (
                         'Finalizar compra'
                       )}
