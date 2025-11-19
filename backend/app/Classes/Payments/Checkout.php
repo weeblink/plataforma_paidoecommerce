@@ -185,13 +185,10 @@ abstract class Checkout {
         string $token = ''
     ) : \stdClass
     {
-
-
-
         try {
-
-            if( $this->expires_in !== null && now() > $this->expires_in )
-                $this->refreshToken(  );
+            if ($this->expires_in !== null && now() > $this->expires_in) {
+                $this->refreshToken();
+            }
 
             $client = new \GuzzleHttp\Client();
 
@@ -213,14 +210,42 @@ abstract class Checkout {
             $response = $client->request($method, $url, $options);
             $responseData = json_decode($response->getBody()->getContents());
 
-            if( isset( $responseData->success ) && ! $responseData->success ) {
-                throw new Exception("An unexpected error occurred");
+            // Caso a Appmax responda 200 com { success: false }
+            if (isset($responseData->success) && !$responseData->success) {
+                if (isset($responseData->text)) {
+                    // Aqui já subimos o motivo limpo para o controller
+                    throw new \Exception($responseData->text, 400);
+                }
+
+                throw new \Exception('Erro ao processar pagamento na integração.', 400);
             }
 
             return $responseData;
-        } catch (Exception $e) {
-            Log::debug($e->getMessage());
-            throw new Exception("Erro ao realizar requisição: " . $e->getMessage());
+
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+
+            // Aqui tratamos 400/422/etc vindos da Appmax
+            Log::debug('[Checkout::request] HTTP error: ' . $e->getMessage());
+
+            if ($e->hasResponse()) {
+                $body = (string) $e->getResponse()->getBody();
+                Log::debug('[Checkout::request] Response body: ' . $body);
+
+                $json = json_decode($body, true);
+
+                if (json_last_error() === JSON_ERROR_NONE && isset($json['text'])) {
+                    // Joga para cima já com a mensagem exata deles
+                    throw new \Exception($json['text'], 400);
+                }
+            }
+
+            // Se não conseguir interpretar, relança a própria RequestException
+            throw $e;
+
+        } catch (\Exception $e) {
+            Log::debug('[Checkout::request] General error: ' . $e->getMessage());
+            // Relança como está, SEM embrulhar de novo
+            throw $e;
         }
     }
 }
