@@ -352,18 +352,7 @@ class PaymentController extends Controller
             // Criar pagamento
             $payment = new Payment();
             
-            try {
-                $paymentId = $payment->createNewPayment($params, $user->id);
-            } catch (GuzzleException $e) {
-                Log::error("[PaymentController] Guzzle error: " . $e->getMessage());
-                
-                // Erros específicos de gateway
-                if (strpos($e->getMessage(), 'Connection') !== false) {
-                    throw new Exception('Erro de conexão com o processador de pagamento. Tente novamente.');
-                }
-                
-                throw new Exception('Erro ao processar pagamento no gateway');
-            }
+            $paymentId = $payment->createNewPayment($params, $user->id);
 
             DB::commit();
 
@@ -373,35 +362,48 @@ class PaymentController extends Controller
             ], 201);
 
         } catch (Exception $e) {
-            DB::rollback();
+           DB::rollBack();
 
-            Log::error("[PaymentController::createPayment] Error: " . $e->getMessage() . " | Line: " . $e->getLine() . " | File: " . $e->getFile());
+            Log::error("[PaymentController::createPayment] Error: " . $e->getMessage() .
+                " | Line: " . $e->getLine() .
+                " | File: " . $e->getFile()
+            );
 
+            // Mensagem padrão / fallback
+            $errorMessage = 'Não foi possível processar o pagamento. Por favor, tente novamente.';
+            $statusCode   = 500;
+
+            /**
+             * 1) Se for erro do Guzzle com resposta do gateway (Appmax)
+             */
             if ($e instanceof \GuzzleHttp\Exception\ClientException && $e->hasResponse()) {
-                $response = json_decode($e->getResponse()->getBody()->getContents(), true);
+                $body = (string) $e->getResponse()->getBody();
+                $response = json_decode($body, true);
 
                 if (isset($response['text'])) {
-                    $errorMessage = $response['text']; // mensagem REAL do gateway
-                    $statusCode = 400;
+                    // Mensagem REAL que veio da Appmax
+                    $errorMessage = $response['text'];
+                    $statusCode   = 400;
                 }
             }
-
-            // Determinar tipo de erro e retornar mensagem apropriada
-            $errorMessage = 'Não foi possível processar o pagamento. Por favor, tente novamente.';
-            $statusCode = 500;
-
-            // Erros conhecidos
-            if (strpos($e->getMessage(), 'gateway') !== false) {
-                $errorMessage = 'Erro ao comunicar com o processador de pagamento. Tente novamente em alguns instantes.';
-            } elseif (strpos($e->getMessage(), 'App checkout not found') !== false) {
-                $errorMessage = 'Sistema de pagamento não configurado. Entre em contato com o suporte.';
-                $statusCode = 503;
-            } elseif (strpos($e->getMessage(), 'Product not found') !== false) {
-                $errorMessage = 'Produto não encontrado';
-                $statusCode = 404;
-            } elseif (strpos($e->getMessage(), 'Customer') !== false) {
-                $errorMessage = 'Erro ao processar informações do cliente. Verifique os dados e tente novamente.';
-                $statusCode = 400;
+            /**
+             * 2) Regras de erro conhecidas da sua aplicação
+             *    (só entra aqui se NÃO for o caso acima, pra não sobrescrever)
+             */
+            else {
+                if (strpos($e->getMessage(), 'gateway') !== false) {
+                    $errorMessage = 'Erro ao comunicar com o processador de pagamento. Tente novamente em alguns instantes.';
+                    // 502 / 503 também podem ser considerados aqui
+                } elseif (strpos($e->getMessage(), 'App checkout not found') !== false) {
+                    $errorMessage = 'Sistema de pagamento não configurado. Entre em contato com o suporte.';
+                    $statusCode   = 503;
+                } elseif (strpos($e->getMessage(), 'Product not found') !== false) {
+                    $errorMessage = 'Produto não encontrado';
+                    $statusCode   = 404;
+                } elseif (strpos($e->getMessage(), 'Customer') !== false) {
+                    $errorMessage = 'Erro ao processar informações do cliente. Verifique os dados e tente novamente.';
+                    $statusCode   = 400;
+                }
             }
 
             return response()->json([
