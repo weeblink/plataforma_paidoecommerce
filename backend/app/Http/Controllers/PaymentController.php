@@ -362,48 +362,40 @@ class PaymentController extends Controller
             ], 201);
 
         } catch (Exception $e) {
-           DB::rollBack();
+            DB::rollBack();
 
             Log::error("[PaymentController::createPayment] Error: " . $e->getMessage() .
                 " | Line: " . $e->getLine() .
                 " | File: " . $e->getFile()
             );
 
-            // Mensagem padrão / fallback
-            $errorMessage = 'Não foi possível processar o pagamento. Por favor, tente novamente.';
-            $statusCode   = 500;
+            // 1) Base: usa o que veio da Exception
+            $errorMessage = $e->getMessage();
+            $statusCode   = $e->getCode();
 
-            /**
-             * 1) Se for erro do Guzzle com resposta do gateway (Appmax)
-             */
-            if ($e instanceof \GuzzleHttp\Exception\ClientException && $e->hasResponse()) {
-                $body = (string) $e->getResponse()->getBody();
-                $response = json_decode($body, true);
-
-                if (isset($response['text'])) {
-                    // Mensagem REAL que veio da Appmax
-                    $errorMessage = $response['text'];
-                    $statusCode   = 400;
-                }
+            // Garante um status HTTP válido
+            if ($statusCode < 400 || $statusCode > 599) {
+                $statusCode = 500;
             }
-            /**
-             * 2) Regras de erro conhecidas da sua aplicação
-             *    (só entra aqui se NÃO for o caso acima, pra não sobrescrever)
-             */
-            else {
-                if (strpos($e->getMessage(), 'gateway') !== false) {
-                    $errorMessage = 'Erro ao comunicar com o processador de pagamento. Tente novamente em alguns instantes.';
-                    // 502 / 503 também podem ser considerados aqui
-                } elseif (strpos($e->getMessage(), 'App checkout not found') !== false) {
-                    $errorMessage = 'Sistema de pagamento não configurado. Entre em contato com o suporte.';
-                    $statusCode   = 503;
-                } elseif (strpos($e->getMessage(), 'Product not found') !== false) {
-                    $errorMessage = 'Produto não encontrado';
-                    $statusCode   = 404;
-                } elseif (strpos($e->getMessage(), 'Customer') !== false) {
-                    $errorMessage = 'Erro ao processar informações do cliente. Verifique os dados e tente novamente.';
-                    $statusCode   = 400;
-                }
+
+            // Se por algum motivo vier mensagem vazia, aplica fallback
+            if (empty($errorMessage)) {
+                $errorMessage = 'Não foi possível processar o pagamento. Por favor, tente novamente.';
+            }
+
+            // 2) Regras específicas da SUA aplicação (apenas se quiser sobrescrever)
+            if (strpos($e->getMessage(), 'gateway') !== false) {
+                $errorMessage = 'Erro ao comunicar com o processador de pagamento. Tente novamente em alguns instantes.';
+                // aqui você pode manter 500 ou colocar 502/503 se quiser
+            } elseif (strpos($e->getMessage(), 'App checkout not found') !== false) {
+                $errorMessage = 'Sistema de pagamento não configurado. Entre em contato com o suporte.';
+                $statusCode   = 503;
+            } elseif (strpos($e->getMessage(), 'Product not found') !== false) {
+                $errorMessage = 'Produto não encontrado';
+                $statusCode   = 404;
+            } elseif (strpos($e->getMessage(), 'Customer') !== false) {
+                $errorMessage = 'Erro ao processar informações do cliente. Verifique os dados e tente novamente.';
+                $statusCode   = 400;
             }
 
             return response()->json([
